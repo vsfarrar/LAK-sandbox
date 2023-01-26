@@ -35,7 +35,9 @@ SAI, or systemic advantage index, is a metric that takes into account multiple a
 
 -   parental education (i.e., first-generation college-going status)
 
-**Your task: Walk through one of the lines of code and compare it with the SAI table below from the talk. Can you explain where the SAI assignment comes from?**
+💭 Can you think of any other systemic advantages not included in this index that likely influence student's outcomes in a course? What would be the challenges to adding those identities or advantages to this index?
+
+➡️ **Your task: Walk through one of the lines of code and compare it with the SAI table below from the talk. Can you explain where the SAI assignment comes from?**
 
 ```{r SAI calculation, echo=TRUE}
 #this code goes through all possible combinations of the 4 advantage axes and assigns an SAI based on that students' values
@@ -61,6 +63,8 @@ syndat <-
     TRUE ~ "NA"))
 ```
 
+# Exploring course outcomes across SAI
+
 Let's explore what grade outcomes look like across levels of SAI in our course of interest.
 
 ```{r SAI summary stats, warning=FALSE, message=FALSE}
@@ -71,3 +75,21 @@ syndat %>%
             mean_grade = mean(numgrade, na.rm = T),
             sd_grade = sd(numgrade, na.rm = T))
 ```
+
+```{r SAI plot}
+#plot raw grades by all disciplines 
+ggplot(syndat, aes(x = sai, y = numgrade, color = crs_name)) + 
+    stat_summary(geom = "point", fun.y = "mean", 
+                 position = position_dodge(0.2)) + 
+    stat_summary(geom = "errorbar", fun.data = "mean_cl_normal", 
+                 width = 0.1, position = position_dodge(0.2)) + 
+  theme_bw()
+```
+
+While we can see differences in raw grade outcomes across the advantages spectrum, many studies control for metrics of prior academic performance when evaluating outcomes in a course.
+
+These are typically: high school GPA, standardized test scores (SAT/ACT), prior cumulative GPA at an institution, or GPA excluding the course of interest (GPAO).
+
+💭 Given the talks today, what are some issues with referencing prior academic performance as a "control" for student preparation?
+
+**Grade anomaly**, or the difference between the current course grade and a student's prior academic performance, can show us how outcomes in this course differ from student's previous experiences at the instution (or other academic settings).
