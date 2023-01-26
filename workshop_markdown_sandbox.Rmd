@@ -7,24 +7,67 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+syndat <- read.csv(file = "SEISMIC_synthetic_data_2023-01-26.csv")
+
+#load packages
+library(tidyverse)
 ```
 
-## R Markdown
+# Define Your Course of Interest
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+What course are you interested in looking at? Options: BIO300, MATH100
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Define it below, in quotes "", in the code below. This will be used in the rest of the code, and you can always come back and change it.
 
 ```{r cars}
-summary(cars)
+course_of_interest <- "MATH100"
 ```
 
-## Including Plots
+## Calculating SAI
 
-You can also embed plots, for example:
+SAI, or systemic advantage index, is a metric that takes into account multiple axes of student identities, including:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+-   race/ethnicity
+
+-   gender
+
+-   socioeconomic status
+
+-   parental education (i.e., first-generation college-going status)
+
+**Your task: Walk through one of the lines of code and compare it with the SAI table below from the talk. Can you explain where the SAI assignment comes from?**
+
+```{r SAI calculation, echo=TRUE}
+#this code goes through all possible combinations of the 4 advantage axes and assigns an SAI based on that students' values
+#as ethniccode_cat == 1 is the "BIPOC" label, all other categories are considered advantaged 
+syndat <-
+  syndat %>% mutate(sai = case_when(
+    female == "0" & ethniccode_cat != "1" & firstgen == "0" & lowincomeflag == "0"  ~ "4",
+    female == "1" & ethniccode_cat != "1" & firstgen == "0" & lowincomeflag == "0"  ~ "3",
+    female == "0" & ethniccode_cat == "1" & firstgen == "0" & lowincomeflag == "0"  ~ "3", 
+    female == "0" & ethniccode_cat != "1" & firstgen == "0" & lowincomeflag == "1"  ~ "3", 
+    female == "0" & ethniccode_cat != "1" & firstgen == "1" & lowincomeflag == "0"  ~ "3", 
+    female == "0" & ethniccode_cat == "1" & firstgen == "1" & lowincomeflag == "0"  ~ "2", 
+    female == "0" & ethniccode_cat == "1" & firstgen == "0" & lowincomeflag == "1"  ~ "2", 
+    female == "1" & ethniccode_cat == "1" & firstgen == "0" & lowincomeflag == "0"  ~ "2", 
+    female == "0" & ethniccode_cat != "1" & firstgen == "1" & lowincomeflag == "1"  ~ "2", 
+    female == "1" & ethniccode_cat != "1" & firstgen == "1" & lowincomeflag == "0"  ~ "2", 
+    female == "1" & ethniccode_cat != "1" & firstgen == "0" & lowincomeflag == "1"  ~ "2", 
+    female == "1" & ethniccode_cat != "1" & firstgen == "1" & lowincomeflag == "1"  ~ "1", 
+    female == "1" & ethniccode_cat == "1" & firstgen == "1" & lowincomeflag == "0"  ~ "1",
+    female == "1" & ethniccode_cat == "1" & firstgen == "0" & lowincomeflag == "1"  ~ "1", 
+    female == "0" & ethniccode_cat == "1" & firstgen == "1" & lowincomeflag == "1"  ~ "1",
+    female == "1" & ethniccode_cat == "1" & firstgen == "1" & lowincomeflag == "1"  ~ "0",
+    TRUE ~ "NA"))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Let's explore what grade outcomes look like across levels of SAI in our course of interest.
+
+```{r SAI summary stats, warning=FALSE, message=FALSE}
+syndat %>%
+  filter(crs_name == course_of_interest) %>%
+  group_by(crs_name, sai) %>%
+  summarise(n = n(),
+            mean_grade = mean(numgrade, na.rm = T),
+            sd_grade = sd(numgrade, na.rm = T))
+```
