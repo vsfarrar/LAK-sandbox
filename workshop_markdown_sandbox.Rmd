@@ -7,7 +7,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-syndat <- read.csv(file = "SEISMIC_synthetic_data_2023-01-26.csv")
+syndat <- read.csv(file = "~/Downloads/LAK-workshop-materials/sim_data_v.2.csv")
+
+#renaming variables MV synthetic data
+syndat$crs_name <- syndat$course
+syndat$ethniccode_cat <- syndat$ethnicity
+syndat$firstgen <- syndat$first_gen
+syndat$lowincomeflag <- syndat$lowincome
+syndat$numgrade <- syndat$grade
 
 #load packages
 library(tidyverse)
@@ -19,8 +26,9 @@ What course are you interested in looking at? Options: BIO300, MATH100
 
 Define it below, in quotes "", in the code below. This will be used in the rest of the code, and you can always come back and change it.
 
-```{r cars}
-course_of_interest <- "MATH100"
+```{r course of interest}
+#options: "Entry Bio", "Lower Chem", "Upper Bio"
+course_of_interest <- "Entry Bio"
 ```
 
 ## Calculating SAI
@@ -77,12 +85,24 @@ syndat %>%
 ```
 
 ```{r SAI plot}
-#plot raw grades by all disciplines 
-ggplot(syndat, aes(x = sai, y = numgrade, color = crs_name)) + 
-    stat_summary(geom = "point", fun.y = "mean", 
+#plot raw grades in course of interest
+syndat %>%
+  filter(crs_name %in% course_of_interest) %>%
+  ggplot(aes(x = sai, y = numgrade, color = crs_name))+ 
+      stat_summary(geom = "point", fun = "mean", 
                  position = position_dodge(0.2)) + 
     stat_summary(geom = "errorbar", fun.data = "mean_cl_normal", 
-                 width = 0.1, position = position_dodge(0.2)) + 
+                 width = 0.1, position = position_dodge(0.2)) +
+  labs(title = paste(course_of_interest)) + 
+  theme_bw()
+
+#plot raw grades by all disciplines 
+ggplot(syndat, aes(x = sai, y = numgrade, color = crs_name)) + 
+    stat_summary(geom = "point", fun = "mean", 
+                 position = position_dodge(0.2)) + 
+    stat_summary(geom = "errorbar", fun.data = "mean_cl_normal", 
+                 width = 0.1, position = position_dodge(0.2)) +
+  labs(title = "Compare All Disciplines") +
   theme_bw()
 ```
 
@@ -93,3 +113,26 @@ These are typically: high school GPA, standardized test scores (SAT/ACT), prior 
 💭 Given the talks today, what are some issues with referencing prior academic performance as a "control" for student preparation?
 
 **Grade anomaly**, or the difference between the current course grade and a student's prior academic performance, can show us how outcomes in this course differ from student's previous experiences at the instution (or other academic settings).
+
+# Classroom Composition
+
+How does the number of students represented in a course relate to course outcomes for students that hold that identity in that course?
+
+```{r}
+#create classroom structure within synthetic dataset
+
+#arrange data by demographic vars
+syndat <- syndat %>% arrange(course,lowincome, first_gen, ethnicity, female)
+
+#create a section variable
+syndat$crs_section <- rep(c(1:2,1:3,1:4), length.out=2369)
+
+#show percents by demographic var
+syndat %>% group_by(course, crs_section) %>%
+  summarise(n = n(),
+            perc_women = (sum(female == "1", na.rm = T)/n)*100,
+            perc_peer = (sum(ethnicity == "1", na.rm = T)/n)*100,
+            perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100)
+
+```
+
