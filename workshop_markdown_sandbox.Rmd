@@ -172,7 +172,7 @@ syndat %>%
 
 How does the number of students represented in a course relate to course outcomes for students that hold that identity in that course?
 
-```{r}
+```{r create classroom structure in syndat}
 #create classroom structure within synthetic dataset
 
 #arrange data by demographic vars
@@ -189,3 +189,22 @@ syndat %>% group_by(course, crs_section) %>%
             perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100)
 
 ```
+Let's explore the data first: 
+
+```{r correlations of gaps and %}
+#show percents by demographic var
+syndat %>% group_by(course, crs_section) %>%
+  summarise(n = n(),
+            mean_gender_gap = mean(numgrade[female =="1"]) - mean(numgrade[female == "0"]), 
+            perc_women = (sum(female == "1", na.rm = T)/n)*100,
+            perc_peer = (sum(ethnicity == "1", na.rm = T)/n)*100,
+            perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100) %>%
+  ggplot(aes(x = perc_women, y = mean_gender_gap, color = course)) +
+   geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(x = "% Women", y = "Gender Gap in Course Grade (W-M)", 
+       color = "Course") + 
+  theme_bw()
+  
+```
+
