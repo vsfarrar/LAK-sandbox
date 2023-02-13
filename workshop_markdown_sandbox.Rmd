@@ -17,7 +17,9 @@ syndat$lowincomeflag <- syndat$lowincome
 syndat$numgrade <- syndat$grade
 
 #load packages
+  #ISSUE: change to pacman to reduce number of installations needed.
 library(tidyverse)
+library(gmodels)
 ```
 
 # Define Your Course of Interest
@@ -30,6 +32,8 @@ Define it below, in quotes "", in the code below. This will be used in the rest 
 #options: "Entry Bio", "Lower Chem", "Upper Bio"
 course_of_interest <- "Entry Bio"
 ```
+
+# Systemic Advantage Index
 
 ## Calculating SAI
 
@@ -71,7 +75,7 @@ syndat <-
     TRUE ~ "NA"))
 ```
 
-# Exploring course outcomes across SAI
+## Exploring course outcomes across SAI
 
 Let's explore what grade outcomes look like across levels of SAI in our course of interest.
 
@@ -106,6 +110,8 @@ ggplot(syndat, aes(x = sai, y = numgrade, color = crs_name)) +
   theme_bw()
 ```
 
+## SAI and Grade Anomaly
+
 While we can see differences in raw grade outcomes across the advantages spectrum, many studies control for metrics of prior academic performance when evaluating outcomes in a course.
 
 These are typically: high school GPA, standardized test scores (SAT/ACT), prior cumulative GPA at an institution, or GPA excluding the course of interest (GPAO).
@@ -113,6 +119,54 @@ These are typically: high school GPA, standardized test scores (SAT/ACT), prior 
 💭 Given the talks today, what are some issues with referencing prior academic performance as a "control" for student preparation?
 
 **Grade anomaly**, or the difference between the current course grade and a student's prior academic performance, can show us how outcomes in this course differ from student's previous experiences at the instution (or other academic settings).
+
+```{r grade anomaly vs raw grade}
+#returns 95% confidence intervals across courses and SAI for grade anomaly
+syndat %>% 
+  mutate(grade_anomaly = numgrade - gpao) %>%
+  group_by(crs_name, sai) %>%
+  summarise(mean = ci(grade_anomaly)[1], 
+                      lowCI = ci(grade_anomaly)[2],
+                      hiCI = ci(grade_anomaly)[3], 
+                      sd = ci (grade_anomaly)[4])
+```
+
+```{r grade anomaly across SAI}
+#grade anomaly across all disciplines
+ggplot(syndat, aes(x = sai, y = numgrade-gpao, color = crs_name)) + 
+    stat_summary(geom = "point", fun = "mean", 
+                 position = position_dodge(0.2)) + 
+    stat_summary(geom = "errorbar", fun.data = "mean_cl_normal", 
+                 width = 0.1, position = position_dodge(0.2)) +
+  labs(title = "Compare All Disciplines", x = "SAI", 
+       y = "Grade anomaly") +
+  theme_bw()
+```
+
+Another way we can explore the concept of grade anomaly is by comparing the relationship between GPAO and course grades for each level of SAI.
+
+```{r gpao vs numgrade, message=FALSE, warning=FALSE}
+syndat %>%
+  group_by(crs_name, sai) %>%
+  summarise(mean_gpao = ci(gpao)[1], 
+            lo_gpao = ci(gpao)[2],
+            hi_gpao = ci(gpao)[3], 
+            mean_grade = ci(numgrade)[1],
+            lo_grade = ci(numgrade)[2],
+            hi_grade = ci(numgrade)[3]) %>%
+  ggplot(aes(x = mean_gpao, y = mean_grade, color = sai)) +
+  geom_point() + 
+  geom_errorbar(aes(xmin = lo_gpao, xmax = hi_gpao), 
+                width = 0) + 
+  geom_errorbar(aes(ymin = lo_grade, ymax = hi_grade), 
+                width = 0) + 
+  geom_abline(intercept = 0, slope = 1, color = "black") + 
+  facet_wrap(~crs_name) +
+  theme_bw()
+                    
+```
+
+**Question**: Are students in the course of interest getting grades that are lower on average ("grade penalty") or higher on average ("grade bonus") compared to their other courses? Does this effect differ with the number of systemic advantages (SAI)?
 
 # Classroom Composition
 
@@ -135,4 +189,3 @@ syndat %>% group_by(course, crs_section) %>%
             perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100)
 
 ```
-
