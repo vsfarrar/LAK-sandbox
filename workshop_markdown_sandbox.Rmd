@@ -202,7 +202,8 @@ syndat %>% group_by(crs_name, crs_section) %>%
             perc_firstgen = (sum(firstgen == "1", na.rm = T)/n)*100)
 
 ```
-Let's explore the data first: 
+
+Let's explore the data first:
 
 ```{r calculate gaps by section}
 #plot correlations between differences in numgrade and class representation for both men and women 
@@ -221,6 +222,7 @@ syndat %>%
 gaps_by_sect      
             
 ```
+
 ```{r gender gaps vs % women}
 #plot gender gaps vs % women
 #note: facet wrap is not as useful as the % for PEER vs the % for female are quite different across courses
@@ -235,6 +237,7 @@ ggplot(aes(x = perc_class, y = mean_grade_diff,
        color = "Course") + 
   theme_bw()
 ```
+
 ```{r grade gaps vs % PEER}
 #plot grade gaps vs % PEER
 #note: facet wrap is not as useful as the % for PEER vs the % for female are quite different across courses
@@ -249,17 +252,19 @@ ggplot(aes(x = perc_class, y = mean_grade_diff,
        color = "Course") + 
   theme_bw()
 ```
-Based on these correlations alone, would you predict significant relationships between classroom composition (% representation) and course outcomes for individual students, based upon their reported identity? 
+
+Based on these correlations alone, would you predict significant relationships between classroom composition (% representation) and course outcomes for individual students, based upon their reported identity?
 
 (If you need more information, what additional metric would you want to plot or see in order to answer that question?)
+
+## Linear mixed models
 
 To address that question, we will build general linear models that incorporate demographic variables (here, gender and ethnicity/race), classroom composition, and their interaction to see if % representation relates in any way to student grade outcomes. We will control for GPAO as a control for prior academic performance.
 
 ```{r linear mixed models}
 #linear mixed model call: 
   #numgrade ~ gpao + [demographic_variable]*[% of class in that group] + (1|crs_section)
-
-
+classcomp_lms <- 
 syndat %>%
   mutate(urm = ifelse(ethniccode_cat == "1",1,0)) %>%
   pivot_longer(cols = c(female, urm, firstgen),
@@ -275,6 +280,26 @@ syndat %>%
          results = map(fit, tidy)) %>%
   unnest(results) %>%
   select(-data, -fit) %>%
-  mutate(p.value = round(p.value, digits = 4)) 
+  mutate(p.value = round(p.value, digits = 4), 
+         signif = ifelse(p.value < 0.05, 1,0))
+
+classcomp_lms
 ```
 
+```{r}
+classcomp_lms %>%
+  filter(demo_var == "female") %>%
+  filter(term %in% c("perc_class1","value","perc_class1:value")) %>%
+  ggplot(aes(x = crs_name, y = estimate)) + 
+  geom_col(aes(fill = as.factor(signif)), color = "black") + 
+  labs(x = "Course", fill = "p < 0.05") +
+  scale_fill_manual(values = c("white","turquoise3")) + 
+  facet_grid(~term, scales = "free",
+             labeller = labeller(term = c("perc_class1" = "%Women","value" = "Gender","perc_class1:value" = "%Women*Gender"))) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 1))
+
+#for plotting: 
+  #rename perc_class and value depending on demographic variable
+  #create a column for significance and color/shape based on significance
+```
