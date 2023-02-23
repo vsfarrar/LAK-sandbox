@@ -7,8 +7,21 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-syndat <- read.csv(file = "~/Downloads/LAK-workshop-materials/sim_data_v.2.csv")
+syndat <- read.csv(file = "SEISMIC_synthetic_data_2023-01-26.csv")
 
+
+#load packages
+  #ISSUE: change to pacman to reduce number of installations needed.
+library(tidyverse)
+library(gmodels)
+library(lme4)
+library(lmerTest)
+library(broom)
+library(broom.mixed)
+```
+
+```{r prep MV synthetic data}
+#run this chunk if using Montse's synthetic data - needs to be prepped for code
 #renaming variables MV synthetic data
 syndat$crs_name <- syndat$course
 syndat$ethniccode_cat <- syndat$ethnicity
@@ -16,10 +29,13 @@ syndat$firstgen <- syndat$first_gen
 syndat$lowincomeflag <- syndat$lowincome
 syndat$numgrade <- syndat$grade
 
-#load packages
-  #ISSUE: change to pacman to reduce number of installations needed.
-library(tidyverse)
-library(gmodels)
+#create a section variable
+  #used in classroom composition analysis
+
+#arrange data by demographic vars
+syndat <- syndat %>% arrange(crs_name,lowincomeflag, firstgen, ethniccode_cat, female)
+#then randomly assign sections
+syndat$crs_section <- rep(c(1:2,1:3,1:4), length.out=2369) #length of dataset 
 ```
 
 # Define Your Course of Interest
@@ -29,8 +45,9 @@ What course are you interested in looking at? Options: BIO300, MATH100
 Define it below, in quotes "", in the code below. This will be used in the rest of the code, and you can always come back and change it.
 
 ```{r course of interest}
-#options: "Entry Bio", "Lower Chem", "Upper Bio"
-course_of_interest <- "Entry Bio"
+#MV options: "Entry Bio", "Lower Chem", "Upper Bio"
+
+course_of_interest <- "BIO300"
 ```
 
 # Systemic Advantage Index
@@ -123,6 +140,7 @@ These are typically: high school GPA, standardized test scores (SAT/ACT), prior 
 ```{r grade anomaly vs raw grade}
 #returns 95% confidence intervals across courses and SAI for grade anomaly
 syndat %>% 
+  drop_na(numgrade, gpao) %>%
   mutate(grade_anomaly = numgrade - gpao) %>%
   group_by(crs_name, sai) %>%
   summarise(mean = ci(grade_anomaly)[1], 
@@ -147,6 +165,7 @@ Another way we can explore the concept of grade anomaly is by comparing the rela
 
 ```{r gpao vs numgrade, message=FALSE, warning=FALSE}
 syndat %>%
+  drop_na(numgrade, gpao) %>%
   group_by(crs_name, sai) %>%
   summarise(mean_gpao = ci(gpao)[1], 
             lo_gpao = ci(gpao)[2],
@@ -170,41 +189,92 @@ syndat %>%
 
 # Classroom Composition
 
+Based upon work in WG1P3 by Angel Sylvester and Heather Rypkema at University of Michigan
+
 How does the number of students represented in a course relate to course outcomes for students that hold that identity in that course?
 
-```{r create classroom structure in syndat}
-#create classroom structure within synthetic dataset
-
-#arrange data by demographic vars
-syndat <- syndat %>% arrange(course,lowincome, first_gen, ethnicity, female)
-
-#create a section variable
-syndat$crs_section <- rep(c(1:2,1:3,1:4), length.out=2369)
-
+```{r composition by section}
 #show percents by demographic var
-syndat %>% group_by(course, crs_section) %>%
+syndat %>% group_by(crs_name, crs_section) %>%
   summarise(n = n(),
             perc_women = (sum(female == "1", na.rm = T)/n)*100,
-            perc_peer = (sum(ethnicity == "1", na.rm = T)/n)*100,
-            perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100)
+            perc_peer = (sum(ethniccode_cat == "1", na.rm = T)/n)*100,
+            perc_firstgen = (sum(firstgen == "1", na.rm = T)/n)*100)
 
 ```
 Let's explore the data first: 
 
-```{r correlations of gaps and %}
-#show percents by demographic var
-syndat %>% group_by(course, crs_section) %>%
+```{r calculate gaps by section}
+#plot correlations between differences in numgrade and class representation for both men and women 
+
+gaps_by_sect <-
+syndat %>% 
+  #sort data by demographic values of interest
+  pivot_longer(cols = c(female:ethniccode_cat),
+               names_to = "demo_var",
+               values_to = "value") %>%
+  group_by(demo_var, crs_name, crs_section) %>%
   summarise(n = n(),
-            mean_gender_gap = mean(numgrade[female =="1"]) - mean(numgrade[female == "0"]), 
-            perc_women = (sum(female == "1", na.rm = T)/n)*100,
-            perc_peer = (sum(ethnicity == "1", na.rm = T)/n)*100,
-            perc_firstgen = (sum(first_gen == "1", na.rm = T)/n)*100) %>%
-  ggplot(aes(x = perc_women, y = mean_gender_gap, color = course)) +
-   geom_point() + 
+            perc_class = sum(value == "1", na.rm = T)/n*100,
+            mean_grade_diff = mean(numgrade[value == 1], na.rm = T) - mean(numgrade[value == 0], na.rm = T))
+      
+gaps_by_sect      
+            
+```
+```{r gender gaps vs % women}
+#plot gender gaps vs % women
+#note: facet wrap is not as useful as the % for PEER vs the % for female are quite different across courses
+
+gaps_by_sect %>%
+  filter(demo_var == "female") %>%
+ggplot(aes(x = perc_class, y = mean_grade_diff, 
+           color = crs_name)) +
+  geom_point() + 
   geom_smooth(method = "lm") + 
-  labs(x = "% Women", y = "Gender Gap in Course Grade (W-M)", 
+  labs(x = "% Women", y = "Gender gap in course grade (M-W)", 
        color = "Course") + 
   theme_bw()
-  
+```
+```{r grade gaps vs % PEER}
+#plot grade gaps vs % PEER
+#note: facet wrap is not as useful as the % for PEER vs the % for female are quite different across courses
+
+gaps_by_sect %>%
+  filter(demo_var == "ethniccode_cat") %>%
+ggplot(aes(x = perc_class, y = mean_grade_diff, 
+           color = crs_name)) +
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  labs(x = "% PEER", y = "Equity gap in course grade \n(nonPEER-PEER)", 
+       color = "Course") + 
+  theme_bw()
+```
+Based on these correlations alone, would you predict significant relationships between classroom composition (% representation) and course outcomes for individual students, based upon their reported identity? 
+
+(If you need more information, what additional metric would you want to plot or see in order to answer that question?)
+
+To address that question, we will build general linear models that incorporate demographic variables (here, gender and ethnicity/race), classroom composition, and their interaction to see if % representation relates in any way to student grade outcomes. We will control for GPAO as a control for prior academic performance.
+
+```{r linear mixed models}
+#linear mixed model call: 
+  #numgrade ~ gpao + [demographic_variable]*[% of class in that group] + (1|crs_section)
+
+
+syndat %>%
+  mutate(urm = ifelse(ethniccode_cat == "1",1,0)) %>%
+  pivot_longer(cols = c(female, urm, firstgen),
+               names_to = "demo_var",
+               values_to = "value") %>%
+  group_by(demo_var, crs_name, crs_section) %>%
+  mutate(n_section = n(),
+         perc_class1 = sum(value == "1", na.rm = T)/n_section*100) %>%
+  ungroup() %>%
+  group_by(crs_name, demo_var) %>%
+  nest() %>%
+  mutate(fit = map(data, ~lmer(numgrade ~ gpao + perc_class1*value + (1|crs_section), data = .)), 
+         results = map(fit, tidy)) %>%
+  unnest(results) %>%
+  select(-data, -fit) %>%
+  mutate(p.value = round(p.value, digits = 4)) 
 ```
 
